@@ -1,6 +1,6 @@
 # Vault
 
-A local-first design inspiration library. Drop in screenshots of designs you like;
+A local-first design inspiration library. Drop in screenshots of designs you like, or use the Chrome extension to right click on any photo and add to your library;
 Claude (vision) auto-titles, categorizes, tags, and writes design notes for each one.
 Everything runs on your machine — no accounts, no cloud database.
 
