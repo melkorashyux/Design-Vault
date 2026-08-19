@@ -36,6 +36,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local sqlite db + uploaded screenshots
+/data/vault.db
+/data/vault.db-*
+/data/uploads/*
+!/data/uploads/__placeholder-*.svg
+/data/exports/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

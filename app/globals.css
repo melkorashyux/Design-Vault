@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg: #0a0a0a;
+  --color-surface: #141414;
+  --color-surface-hover: #1a1a1a;
+  --color-border: #262626;
+  --color-text: #ededed;
+  --color-muted: #8a8a8a;
+  /* #5a5a5a read ~2.9:1 against --color-bg, well under the 4.5:1 AA floor for
+     text — this token is used for real informational content (labels, counts,
+     dates), not decoration, so it has to clear AA. */
+  --color-dim: #808080;
+  --color-accent: #b9f73e;
+  /* Overridden at runtime by the Dev Tools font picker (see lib/theme.ts) */
+  --font-mono: var(--font-plex-mono);
+  /* Overridden at runtime by the Dev Tools header-size picker (see lib/theme.ts) */
+  --hero-scale: 1;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-muted: var(--color-muted);
+  --color-dim: var(--color-dim);
+  --color-accent: var(--color-accent);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--color-border);
+}
+
+/* Higher specificity than the `outline: none` reset below, so this wins
+   whenever an element is actually keyboard-focused and stays silent otherwise. */
+:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* Grain / halftone texture overlay */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+}
+
+.tracked-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+/* Page/dialog title role — the strongest text on a screen (page h1s, modal h2). */
+.page-heading {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+/* Card title role — one deliberate step above body, for the primary scan target in a grid. */
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+/* Library page hero. --hero-scale is a multiplier (Dev Tools header-size picker). */
+.hero-heading {
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  font-size: clamp(
+    calc(22px * var(--hero-scale)),
+    calc(4.2vw * var(--hero-scale)),
+    calc(44px * var(--hero-scale))
+  );
+}
+
+.stepped-heading > span:nth-child(1) {
+  color: rgba(237, 237, 237, 1);
+}
+.stepped-heading > span:nth-child(2) {
+  color: rgba(237, 237, 237, 0.55);
+}
+.stepped-heading > span:nth-child(3) {
+  color: rgba(237, 237, 237, 0.35);
+}
+
+input,
+textarea,
+select {
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
 }

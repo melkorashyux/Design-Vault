@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vault
 
-## Getting Started
+A local-first design inspiration library. Drop in screenshots of designs you like;
+Claude (vision) auto-titles, categorizes, tags, and writes design notes for each one.
+Everything runs on your machine — no accounts, no cloud database.
 
-First, run the development server:
+## Setup
 
 ```bash
+npm install
+cp .env.example .env.local   # then paste your key into .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Get an API key at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+and put it in `.env.local` as `ANTHROPIC_API_KEY`. Without a key, uploads still work —
+each screenshot just falls back to a minimal record (title = filename) instead of a
+full Claude analysis.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Optionally set `ANALYSIS_MODEL` in `.env.local` to swap the vision model (defaults to
+`claude-sonnet-5`).
 
-## Learn More
+`.env.local` also comes with a `VAULT_TOKEN` already generated (and mirrored as
+`NEXT_PUBLIC_VAULT_TOKEN` for the web UI itself). This is the secret the Chrome
+extension authenticates with — see [Chrome extension](#chrome-extension-save-to-vault)
+below. It's specific to your machine and lives only in `.env.local` (gitignored) —
+never commit it or paste it into this file.
 
-To learn more about Next.js, take a look at the following resources:
+Generate your own any time with:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+and paste the value into both `VAULT_TOKEN` and `NEXT_PUBLIC_VAULT_TOKEN` in `.env.local`.
 
-## Deploy on Vercel
+## Where data lives
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `data/vault.db` — SQLite database (items, folders — metadata only, no image bytes)
+- `data/uploads/` — the actual screenshot/image files, referenced by filename from the db
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Both are gitignored except for three seed placeholder SVGs used to populate the library
+on first run. Deleting `data/vault.db` resets your library (images in `data/uploads`
+are untouched but become orphaned).
+
+## How it works
+
+1. Drop screenshots onto the Library page or the Add page, or right-click any image on
+   the web and save it via the [Chrome extension](#chrome-extension-save-to-vault).
+2. Each image is saved to `data/uploads/`, sent to Claude with a design-librarian system
+   prompt, and the returned JSON (title, category, tags, description, design notes,
+   dominant colors, typography, layout) is stored as a row in SQLite.
+3. Multiple files upload concurrently (limit of 3 at a time) so the grid fills in as
+   each analysis finishes.
+4. The Library page filters everything client-side — search matches title, description,
+   design notes, and tags; folder, category, and tag filters all stack with search.
+5. Click any card to open the detail view, edit any field, move it to a different
+   folder, copy a color swatch's hex, or delete the item.
+
+### Folders
+
+A **folder** is a manual bucket you file items into by hand — separate from the
+category/tags Claude generates automatically. Every item lives in exactly one folder;
+new items with nothing specified land in the default **Unsorted** folder. Manage
+folders from the sidebar on the Library page (create, rename, delete — deleting a
+folder moves its items to Unsorted rather than deleting them; Unsorted itself can't be
+renamed or deleted).
+
+## Chrome extension (Save to Vault)
+
+A Manifest V3 extension in `./extension/` lets you right-click any image on the web,
+pick a folder, and have it saved and analyzed exactly like an upload.
+
+**Load it:**
+
+1. Make sure `npm run dev` is running — the extension talks to `http://localhost:3000`.
+2. Open `chrome://extensions`, enable **Developer mode** (top right).
+3. Click **Load unpacked**, select the `extension/` folder.
+4. Click the extension's icon in the toolbar to open its popup, paste your `VAULT_TOKEN`
+   (see above) into **Vault Token**, and click **Test Connection** to confirm it can
+   reach the vault.
+
+**Use it:** right-click any image on any page → **Save to Vault** → pick a folder. A
+notification confirms the save, and the image shows up in your Library within a few
+seconds, auto-titled and tagged like everything else. Create new folders from the
+popup — the right-click menu updates immediately, no reinstall needed.
+
+**Tightening CORS to your extension ID:** by default `/api/ingest` and `/api/folders`
+accept requests from any `chrome-extension://` origin. To lock it to just this
+extension, copy its ID from `chrome://extensions` (shown under the extension's name
+once loaded) and swap the `chrome-extension://` prefix check in `lib/cors.ts` for an
+exact match against `chrome-extension://<your-extension-id>`.
+
+## API routes the extension uses
+
+- `GET /api/folders` — list folders (builds the right-click submenu)
+- `POST /api/folders` — create `{ name }`
+- `PATCH /api/folders/:id` / `DELETE /api/folders/:id` — rename / delete
+- `POST /api/ingest` — save + analyze `{ imageBase64, mediaType, folderId, sourceUrl, pageUrl }`
+  (or `{ sourceUrl, pageUrl }` alone — the server fetches the image itself)
+
+All four require an `X-Vault-Token` header matching `VAULT_TOKEN`.
+
+## Stack
+
+Next.js (App Router, TypeScript) · Tailwind CSS v4 · better-sqlite3 · @anthropic-ai/sdk

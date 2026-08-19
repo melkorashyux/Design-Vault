@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Save to Vault</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        width: 280px;
+        margin: 0;
+        padding: 16px;
+        background: #0a0a0a;
+        color: #ededed;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 12px;
+      }
+      h1 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin: 0 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      h1 .mark {
+        width: 16px;
+        height: 16px;
+        background: #ededed;
+        color: #0a0a0a;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 11px;
+      }
+      label {
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 10px;
+        color: #8a8a8a;
+        margin: 12px 0 4px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        background: #141414;
+        border: 1px solid #262626;
+        color: #ededed;
+        font-family: inherit;
+        font-size: 12px;
+        padding: 7px 8px;
+      }
+      input:focus {
+        outline: none;
+        border-color: #b9f73e;
+      }
+      button {
+        width: 100%;
+        margin-top: 8px;
+        background: transparent;
+        border: 1px solid #262626;
+        color: #ededed;
+        font-family: inherit;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 10px;
+        padding: 8px;
+        cursor: pointer;
+        transition:
+          background 120ms,
+          color 120ms;
+      }
+      button:hover {
+        background: #ededed;
+        color: #0a0a0a;
+      }
+      #status,
+      #folderStatus {
+        margin-top: 8px;
+        font-size: 11px;
+        min-height: 14px;
+        word-break: break-word;
+      }
+      .ok {
+        color: #b9f73e;
+      }
+      .err {
+        color: #ededed;
+        opacity: 0.65;
+      }
+      .row {
+        display: flex;
+        gap: 6px;
+      }
+      .row input {
+        flex: 1;
+      }
+      .row button {
+        width: auto;
+        margin-top: 0;
+        padding: 0 10px;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #262626;
+        margin: 16px 0;
+      }
+      p.hint {
+        color: #5a5a5a;
+        font-size: 10px;
+        margin: 4px 0 0;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1><span class="mark">V</span> Save to Vault</h1>
+
+    <label for="vaultUrl">Vault URL</label>
+    <input id="vaultUrl" type="text" placeholder="http://localhost:3000" />
+
+    <label for="vaultToken">Vault Token</label>
+    <input id="vaultToken" type="password" placeholder="paste VAULT_TOKEN from .env.local" />
+
+    <button id="test">Test Connection</button>
+    <div id="status"></div>
+
+    <hr />
+
+    <label for="newFolder">New Folder</label>
+    <div class="row">
+      <input id="newFolder" type="text" placeholder="folder name" />
+      <button id="createFolder">Add</button>
+    </div>
+    <div id="folderStatus"></div>
+    <p class="hint">Right-click any image → Save to Vault → pick a folder.</p>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
