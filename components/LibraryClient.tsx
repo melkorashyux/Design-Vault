@@ -48,9 +48,34 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
       .catch(() => {});
   }, []);
 
+  const reloadItems = useCallback(() => {
+    fetch("/api/items")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data: { items: VaultItem[] }) => setItems(data.items))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     reloadFolders();
   }, [reloadFolders]);
+
+  // Items saved from elsewhere — the Chrome extension, another tab — land via a
+  // separate request this tab never sees, so an already-open Library tab goes
+  // stale. Catch up whenever the tab regains visibility/focus instead of
+  // requiring a manual reload.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      reloadItems();
+      reloadFolders();
+    }
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [reloadItems, reloadFolders]);
 
   const categories = useMemo(
     () => Array.from(new Set(items.map((i) => i.category))).sort(),
