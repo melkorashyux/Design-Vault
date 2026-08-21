@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { CATEGORIES, UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
+import { matchAllowed } from "@/lib/tags";
 import { ColorSwatch } from "@/components/ColorSwatch";
 import { ExportToast } from "@/components/ExportToast";
 import { ExpandIcon } from "@/components/ItemCard";
 import { Lightbox } from "@/components/Lightbox";
 import { exportForClaude, type ExportResult } from "@/lib/exportClient";
+import { addTagsApi } from "@/lib/tagsClient";
 
 interface Draft {
   title: string;
@@ -37,12 +39,18 @@ function toDraft(item: VaultItem): Draft {
 export function DetailModal({
   item,
   folders,
+  tags,
+  onTagsChanged,
   onClose,
   onUpdated,
   onDeleted,
 }: {
   item: VaultItem;
   folders: Folder[];
+  /** The full tag registry — used to snap a typed tag to its existing casing. */
+  tags: string[];
+  /** Called with the updated registry after a genuinely new tag is registered. */
+  onTagsChanged: (tags: string[]) => void;
   onClose: () => void;
   onUpdated: (item: VaultItem) => void;
   onDeleted: (id: string) => void;
@@ -83,6 +91,11 @@ export function DetailModal({
         const { item: updated } = await res.json();
         onUpdated(updated);
         setEditing(false);
+        // Idempotent — registers any tags typed here that aren't in the
+        // registry yet (insert-or-ignore server-side), a no-op otherwise.
+        if (draft.tags.length > 0) {
+          addTagsApi(draft.tags).then(onTagsChanged).catch(() => {});
+        }
       }
     } finally {
       setSaving(false);
@@ -126,8 +139,12 @@ export function DetailModal({
   }
 
   function addTag() {
-    const value = tagInput.trim().toLowerCase();
-    if (value && !draft.tags.includes(value)) {
+    const typed = tagInput.trim();
+    // Snap to an existing tag's casing when one matches case-insensitively
+    // (e.g. typing "dark" reuses "Dark"); otherwise this is a new tag, kept
+    // as typed — it's registered with the server once the item is saved.
+    const value = typed && (matchAllowed(typed, tags) ?? typed);
+    if (value && !draft.tags.some((t) => t.toLowerCase() === value.toLowerCase())) {
       setDraft((d) => ({ ...d, tags: [...d.tags, value] }));
     }
     setTagInput("");

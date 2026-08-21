@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORIES, UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
+import { matchAllowed } from "@/lib/tags";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterBar } from "@/components/FilterBar";
 import { FolderSidebar } from "@/components/FolderSidebar";
@@ -12,6 +13,7 @@ import { Lightbox } from "@/components/Lightbox";
 import { ExportToast } from "@/components/ExportToast";
 import { uploadFiles, type UploadTask } from "@/lib/uploadClient";
 import { fetchFolders } from "@/lib/foldersClient";
+import { fetchTags, addTagsApi } from "@/lib/tagsClient";
 import { exportForClaude, type ExportResult } from "@/lib/exportClient";
 
 interface PendingUpload {
@@ -21,11 +23,18 @@ interface PendingUpload {
   message?: string;
 }
 
+const VIEW_STORAGE_KEY = "vault-view";
+
 export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
   const [items, setItems] = useState<VaultItem[]>(initialItems);
   const [folders, setFolders] = useState<Folder[]>([]);
+  // The registry of all known tags (seeded + user-added) — the single source
+  // of truth shared with the Ollama/Claude prompt, independent of which tags
+  // happen to be in use on current items.
+  const [knownTags, setKnownTags] = useState<string[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingUpload[]>([]);
+  const [view, setView] = useState<"detail" | "grid">("detail");
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -48,6 +57,12 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
       .catch(() => {});
   }, []);
 
+  const reloadTags = useCallback(() => {
+    fetchTags()
+      .then(setKnownTags)
+      .catch(() => {});
+  }, []);
+
   const reloadItems = useCallback(() => {
     fetch("/api/items")
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
@@ -57,41 +72,78 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
 
   useEffect(() => {
     reloadFolders();
-  }, [reloadFolders]);
+    reloadTags();
+  }, [reloadFolders, reloadTags]);
 
-  // Items saved from elsewhere — the Chrome extension, another tab — land via a
-  // separate request this tab never sees, so an already-open Library tab goes
-  // stale. Catch up whenever the tab regains visibility/focus instead of
-  // requiring a manual reload.
+  // localStorage isn't available during SSR, so state starts at "detail"
+  // (matching what the server rendered) and is synced to the saved value
+  // right after mount.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (stored === "grid" || stored === "detail") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setView(stored);
+    }
+  }, []);
+
+  const pickView = useCallback((next: "detail" | "grid") => {
+    setView(next);
+    window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+  }, []);
+
+  // Items saved from elsewhere — the Chrome extension, another tab, another
+  // window — land via a separate request this tab never sees, so an
+  // already-open Library tab goes stale. Catch up immediately whenever the
+  // tab regains visibility/focus, and poll while it's visible so items saved
+  // from a window that never lost focus (e.g. a second monitor) still show
+  // up on their own.
+  const hasPending = useMemo(
+    () => items.some((item) => item.analysis_status === "pending"),
+    [items],
+  );
+
   useEffect(() => {
     function onVisible() {
       if (document.visibilityState !== "visible") return;
       reloadItems();
       reloadFolders();
+      reloadTags();
     }
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
+
+    // While something is still analyzing (e.g. a Chrome extension save
+    // that just landed), poll more often so its card flips from
+    // "Analyzing…" to real data quickly instead of sitting for 5s.
+    const intervalId = window.setInterval(
+      () => {
+        if (document.visibilityState === "visible") reloadItems();
+      },
+      hasPending ? 1500 : 5000,
+    );
+
     return () => {
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(intervalId);
     };
-  }, [reloadItems, reloadFolders]);
+  }, [reloadItems, reloadFolders, reloadTags, hasPending]);
 
   const categories = useMemo(
     () => Array.from(new Set(items.map((i) => i.category))).sort(),
     [items],
   );
 
+  // `knownTags` (the full registry, alphabetical) is the source of truth for
+  // which tags exist; sort that by current usage so the most-relevant tags
+  // still surface first in the filter bar, same UX as before.
   const tags = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of items) {
       for (const tag of item.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 24)
-      .map(([tag]) => tag);
-  }, [items]);
+    return [...knownTags].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
+  }, [items, knownTags]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -180,13 +232,21 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
   }
 
   async function runBulkTags() {
-    const newTags = bulkTagsInput
+    const rawTags = bulkTagsInput
       .split(",")
-      .map((t) => t.trim().toLowerCase())
+      .map((t) => t.trim())
       .filter(Boolean);
-    if (newTags.length === 0 || selectedIds.size === 0) return;
+    if (rawTags.length === 0 || selectedIds.size === 0) return;
+    // Snap to an existing tag's casing when one matches case-insensitively
+    // (e.g. typing "dark" reuses "Dark" instead of creating a near-duplicate);
+    // anything that doesn't match yet is a genuinely new tag the user is adding.
+    const newTags = Array.from(
+      new Set(rawTags.map((t) => matchAllowed(t, knownTags) ?? t)),
+    );
     setBulkBusy(true);
     try {
+      const updatedTags = await addTagsApi(newTags);
+      setKnownTags(updatedTags);
       await bulkPatch(Array.from(selectedIds), (item) => ({
         tags: Array.from(new Set([...item.tags, ...newTags])),
       }));
@@ -248,7 +308,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
 
   return (
     <main
-      className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-12"
+      className="w-full flex-1 px-6 py-12"
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -343,6 +403,28 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex border border-border">
+                    <button
+                      onClick={() => pickView("detail")}
+                      className={`tracked-label border-r border-border px-3 py-1.5 transition-colors duration-150 ${
+                        view === "detail"
+                          ? "bg-accent text-bg"
+                          : "text-muted hover:text-text"
+                      }`}
+                    >
+                      detail
+                    </button>
+                    <button
+                      onClick={() => pickView("grid")}
+                      className={`tracked-label px-3 py-1.5 transition-colors duration-150 ${
+                        view === "grid"
+                          ? "bg-accent text-bg"
+                          : "text-muted hover:text-text"
+                      }`}
+                    >
+                      grid
+                    </button>
+                  </div>
                   <button
                     onClick={toggleSelectMode}
                     className={`tracked-label border px-3 py-1.5 transition-colors duration-150 ${
@@ -442,9 +524,11 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
               )}
 
               <div
-                className={`mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${
-                  dragOver ? "outline outline-1 outline-dashed outline-accent" : ""
-                }`}
+                className={`mt-4 grid ${
+                  view === "grid"
+                    ? "grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8"
+                    : "grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5"
+                } ${dragOver ? "outline outline-1 outline-dashed outline-accent" : ""}`}
               >
                 {pending.map((p) => (
                   <AnalyzingCard key={p.tempId} previewUrl={p.previewUrl} status={p.status} />
@@ -453,6 +537,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                   <ItemCard
                     key={item.id}
                     item={item}
+                    view={view}
                     onClick={() => setSelected(item)}
                     onExpand={() => setLightboxItem(item)}
                     selectMode={selectMode}
@@ -475,6 +560,8 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
           key={selected.id}
           item={selected}
           folders={folders}
+          tags={knownTags}
+          onTagsChanged={setKnownTags}
           onClose={() => setSelected(null)}
           onUpdated={(updated) => {
             setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));

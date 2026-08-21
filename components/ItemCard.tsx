@@ -9,6 +9,7 @@ export function ItemCard({
   selectMode = false,
   selected = false,
   onToggleSelect,
+  view = "detail",
 }: {
   item: VaultItem;
   onClick: () => void;
@@ -16,8 +17,11 @@ export function ItemCard({
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  view?: "detail" | "grid";
 }) {
   const activate = selectMode ? onToggleSelect : onClick;
+  const compact = view === "grid";
+  const analyzing = item.analysis_status === "pending";
 
   return (
     <div
@@ -30,8 +34,10 @@ export function ItemCard({
           activate?.();
         }
       }}
-      className={`group relative flex cursor-pointer flex-col border bg-surface text-left transition-colors duration-150 hover:bg-surface-hover ${
-        selected ? "border-accent" : "border-border"
+      className={`group relative cursor-pointer text-left transition-colors duration-150 ${
+        compact
+          ? `overflow-hidden border ${selected ? "border-accent" : "border-transparent hover:border-accent"}`
+          : `flex flex-col border bg-surface hover:bg-surface-hover ${selected ? "border-accent" : "border-border"}`
       }`}
     >
       {selectMode && (
@@ -46,14 +52,37 @@ export function ItemCard({
         </span>
       )}
 
-      <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-border bg-bg">
+      <div
+        className={`relative w-full overflow-hidden bg-bg ${
+          compact ? "aspect-square" : "aspect-[4/3] border-b border-border cursor-zoom-in"
+        }`}
+        onClick={
+          !compact && !selectMode && onExpand
+            ? (e) => {
+                // In detail view, the photo opens fullscreen directly — stop
+                // the click from bubbling to the card's own handler, which
+                // opens the side-by-side detail view instead.
+                e.stopPropagation();
+                onExpand();
+              }
+            : undefined
+        }
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/uploads/${item.filename}`}
+          src={`/api/uploads/${item.filename}/thumb?w=${compact ? 440 : 640}`}
           alt={item.title}
-          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          className={`h-full w-full object-cover ${compact ? "transition-transform duration-150 group-hover:scale-105" : ""}`}
         />
-        {!selectMode && onExpand && (
+        {compact && analyzing && (
+          <span className="absolute bottom-1 left-1 flex items-center gap-1 bg-bg/80 px-1.5 py-0.5">
+            <span className="h-1.5 w-1.5 animate-pulse bg-accent" />
+            <span className="tracked-label text-accent">Analyzing</span>
+          </span>
+        )}
+        {compact && !selectMode && onExpand && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -67,24 +96,35 @@ export function ItemCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 p-3">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="card-title line-clamp-1">{item.title}</h3>
-        </div>
-        <p className="tracked-label text-dim">{item.category}</p>
-        {item.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {item.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="tracked-label border border-border px-1.5 py-0.5 text-muted"
-              >
-                {tag}
-              </span>
-            ))}
+      {!compact && (
+        <div className="flex flex-col gap-2 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="card-title line-clamp-1">{item.title}</h3>
           </div>
-        )}
-      </div>
+          {analyzing ? (
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 animate-pulse bg-accent" />
+              <p className="tracked-label text-accent">Analyzing…</p>
+            </div>
+          ) : (
+            <>
+              <p className="tracked-label text-dim">{item.category}</p>
+              {item.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {item.tags.slice(0, 3).map((tag) => (
+                    <span
+                      key={tag}
+                      className="tracked-label border border-border px-1.5 py-0.5 text-muted"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

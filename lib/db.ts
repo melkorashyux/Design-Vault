@@ -4,11 +4,14 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import {
   rowToItem,
+  SEED_TAGS,
   UNSORTED_FOLDER_NAME,
+  type AnalysisStatus,
   type Folder,
   type VaultItem,
   type VaultItemRow,
 } from "@/lib/types";
+import { migrateTaxonomy } from "@/lib/taxonomyMigration";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "vault.db");
@@ -44,16 +47,25 @@ function createConnection() {
       layout TEXT NOT NULL DEFAULT '',
       source_url TEXT,
       folder_id TEXT,
+      analysis_status TEXT NOT NULL DEFAULT 'complete',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tags (
+      name TEXT PRIMARY KEY COLLATE NOCASE,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
   migrateAddFolderIdColumn(db);
+  migrateAddAnalysisStatusColumn(db);
 
   const unsortedId = ensureUnsortedFolder(db);
   db.prepare("UPDATE items SET folder_id = ? WHERE folder_id IS NULL").run(unsortedId);
 
   seedIfEmpty(db, unsortedId);
+  seedTagsIfEmpty(db);
+  migrateTaxonomy(db);
 
   return db;
 }
@@ -63,6 +75,14 @@ function migrateAddFolderIdColumn(db: Database.Database) {
   const columns = db.prepare("PRAGMA table_info(items)").all() as { name: string }[];
   if (!columns.some((c) => c.name === "folder_id")) {
     db.exec("ALTER TABLE items ADD COLUMN folder_id TEXT");
+  }
+}
+
+/** Older databases created before background analysis existed won't have this column. */
+function migrateAddAnalysisStatusColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(items)").all() as { name: string }[];
+  if (!columns.some((c) => c.name === "analysis_status")) {
+    db.exec("ALTER TABLE items ADD COLUMN analysis_status TEXT NOT NULL DEFAULT 'complete'");
   }
 }
 
@@ -150,6 +170,18 @@ function seedIfEmpty(db: Database.Database, unsortedId: string) {
     for (const row of rows) insert.run(row);
   });
   insertMany(seedRows);
+}
+
+function seedTagsIfEmpty(db: Database.Database) {
+  const { count } = db.prepare("SELECT COUNT(*) as count FROM tags").get() as { count: number };
+  if (count > 0) return;
+
+  const insert = db.prepare("INSERT OR IGNORE INTO tags (name, created_at) VALUES (?, ?)");
+  const insertAll = db.transaction((names: readonly string[]) => {
+    const now = new Date().toISOString();
+    for (const name of names) insert.run(name, now);
+  });
+  insertAll(SEED_TAGS);
 }
 
 export function getDb(): Database.Database {
@@ -246,6 +278,34 @@ export function deleteFolder(id: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Tags — the single source of truth for both the UI and the analysis prompt.
+// Seeded once from SEED_TAGS; users can add more, and every addition here is
+// what makes a tag selectable by the model on future items.
+// ---------------------------------------------------------------------------
+
+export function listTags(): string[] {
+  return (
+    getDb().prepare("SELECT name FROM tags ORDER BY name COLLATE NOCASE ASC").all() as {
+      name: string;
+    }[]
+  ).map((row) => row.name);
+}
+
+/** Insert-or-ignore for each name; returns the full, updated tag list. */
+export function addTags(names: string[]): string[] {
+  const trimmed = names.map((n) => n.trim()).filter(Boolean);
+  if (trimmed.length > 0) {
+    const insert = getDb().prepare("INSERT OR IGNORE INTO tags (name, created_at) VALUES (?, ?)");
+    const insertAll = getDb().transaction((values: string[]) => {
+      const now = new Date().toISOString();
+      for (const name of values) insert.run(name, now);
+    });
+    insertAll(trimmed);
+  }
+  return listTags();
+}
+
+// ---------------------------------------------------------------------------
 // Items
 // ---------------------------------------------------------------------------
 
@@ -275,6 +335,7 @@ export interface CreateItemInput {
   layout: string;
   source_url?: string | null;
   folder_id?: string | null;
+  analysis_status?: AnalysisStatus;
 }
 
 export function createItem(input: CreateItemInput): VaultItem {
@@ -283,8 +344,8 @@ export function createItem(input: CreateItemInput): VaultItem {
 
   getDb()
     .prepare(
-      `INSERT INTO items (id, filename, title, category, tags, description, design_notes, colors, typography, layout, source_url, folder_id, created_at)
-       VALUES (@id, @filename, @title, @category, @tags, @description, @design_notes, @colors, @typography, @layout, @source_url, @folder_id, @created_at)`,
+      `INSERT INTO items (id, filename, title, category, tags, description, design_notes, colors, typography, layout, source_url, folder_id, analysis_status, created_at)
+       VALUES (@id, @filename, @title, @category, @tags, @description, @design_notes, @colors, @typography, @layout, @source_url, @folder_id, @analysis_status, @created_at)`,
     )
     .run({
       id,
@@ -299,6 +360,7 @@ export function createItem(input: CreateItemInput): VaultItem {
       layout: input.layout ?? "",
       source_url: input.source_url ?? null,
       folder_id: input.folder_id ?? getUnsortedFolderId(),
+      analysis_status: input.analysis_status ?? "complete",
       created_at,
     });
 
@@ -327,13 +389,14 @@ export function updateItem(id: string, input: UpdateItemInput): VaultItem | null
       input.folder_id === undefined
         ? existing.folder_id
         : (input.folder_id ?? getUnsortedFolderId()),
+    analysis_status: input.analysis_status ?? existing.analysis_status,
   };
 
   getDb()
     .prepare(
       `UPDATE items SET title=@title, category=@category, tags=@tags, description=@description,
        design_notes=@design_notes, colors=@colors, typography=@typography, layout=@layout,
-       source_url=@source_url, folder_id=@folder_id
+       source_url=@source_url, folder_id=@folder_id, analysis_status=@analysis_status
        WHERE id=@id`,
     )
     .run({

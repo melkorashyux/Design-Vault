@@ -22,6 +22,24 @@ full Claude analysis.
 Optionally set `ANALYSIS_MODEL` in `.env.local` to swap the vision model (defaults to
 `claude-sonnet-5`).
 
+### Using a local model instead (Ollama)
+
+Set `ANALYSIS_PROVIDER=ollama` in `.env.local` to run auto-tagging entirely on your
+machine instead of calling Claude — no API key, no upload leaves your machine.
+Requires [Ollama](https://ollama.com) running locally with a vision-capable model
+pulled:
+
+```bash
+ollama pull gemma3:4b
+ollama serve
+```
+
+`OLLAMA_MODEL` defaults to `gemma3:4b` and `OLLAMA_HOST` defaults to
+`http://localhost:11434` — override either in `.env.local` if needed. Local models
+are noticeably weaker than Claude at this task (nuanced tags, naming aesthetic
+movements, staying in valid JSON), so expect lower-quality results in exchange for
+running fully offline.
+
 `.env.local` also comes with a `VAULT_TOKEN` already generated (and mirrored as
 `NEXT_PUBLIC_VAULT_TOKEN` for the web UI itself). This is the secret the Chrome
 extension authenticates with — see [Chrome extension](#chrome-extension-save-to-vault)

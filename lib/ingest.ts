@@ -1,8 +1,10 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { createItem } from "@/lib/db";
-import { analyzeScreenshot } from "@/lib/anthropic";
+import { after } from "next/server";
+import { createItem, updateItem } from "@/lib/db";
+import { analyzeScreenshot } from "@/lib/analysis";
+import { FALLBACK_CATEGORY } from "@/lib/analysis-shared";
 import type { VaultItem } from "@/lib/types";
 
 const UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
@@ -24,7 +26,14 @@ export interface SaveAndAnalyzeInput {
   folderId?: string | null;
 }
 
-/** Saves image bytes to disk, runs the Claude analysis pipeline, and stores the row. */
+/**
+ * Saves image bytes to disk and inserts the row immediately with placeholder
+ * metadata and analysis_status "pending", so the item (and its thumbnail)
+ * shows up right away instead of the caller — the Chrome extension, the
+ * upload form — blocking on however long the vision model takes (Ollama in
+ * particular can take up to two minutes). The real analysis runs afterward
+ * in the background and overwrites the row in place once it resolves.
+ */
 export async function saveAndAnalyze(input: SaveAndAnalyzeInput): Promise<VaultItem> {
   const ext = EXT_BY_MIME[input.mediaType];
   if (!ext) throw new Error(`Unsupported image type: ${input.mediaType}`);
@@ -33,23 +42,31 @@ export async function saveAndAnalyze(input: SaveAndAnalyzeInput): Promise<VaultI
   const filename = `${randomUUID()}${ext}`;
   await fs.writeFile(path.join(UPLOADS_DIR, filename), input.buffer);
 
-  const analysis = await analyzeScreenshot(
-    input.buffer.toString("base64"),
-    input.mediaType,
-    input.fallbackTitle,
-  );
-
-  return createItem({
+  const item = createItem({
     filename,
-    title: analysis.title,
-    category: analysis.category,
-    tags: analysis.tags,
-    description: analysis.description,
-    design_notes: analysis.design_notes,
-    colors: analysis.colors,
-    typography: analysis.typography,
-    layout: analysis.layout,
+    title: input.fallbackTitle,
+    category: FALLBACK_CATEGORY,
+    tags: [],
+    description: "",
+    design_notes: "",
+    colors: [],
+    typography: "",
+    layout: "",
     source_url: input.sourceUrl ?? null,
     folder_id: input.folderId ?? null,
+    analysis_status: "pending",
   });
+
+  const imageBase64 = input.buffer.toString("base64");
+  after(async () => {
+    try {
+      const analysis = await analyzeScreenshot(imageBase64, input.mediaType, input.fallbackTitle);
+      updateItem(item.id, { ...analysis, analysis_status: "complete" });
+    } catch (err) {
+      console.error(`Background analysis failed for item ${item.id}:`, err);
+      updateItem(item.id, { analysis_status: "complete" });
+    }
+  });
+
+  return item;
 }

@@ -9,6 +9,7 @@ import { DetailModal } from "@/components/DetailModal";
 import { Lightbox } from "@/components/Lightbox";
 import { uploadFiles, type UploadTask } from "@/lib/uploadClient";
 import { fetchFolders } from "@/lib/foldersClient";
+import { fetchTags } from "@/lib/tagsClient";
 
 interface PendingUpload {
   tempId: string;
@@ -25,11 +26,15 @@ export function AddClient() {
   const [dragOver, setDragOver] = useState(false);
   const [sourceUrl, setSourceUrl] = useState("");
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchFolders()
       .then(setFolders)
+      .catch(() => {});
+    fetchTags()
+      .then(setTags)
       .catch(() => {});
   }, []);
 
@@ -151,6 +156,8 @@ export function AddClient() {
           key={selected.id}
           item={selected}
           folders={folders}
+          tags={tags}
+          onTagsChanged={setTags}
           onClose={() => setSelected(null)}
           onUpdated={(updated) => {
             setDone((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
