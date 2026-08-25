@@ -2,11 +2,17 @@
   "name": "design-vault",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron": "electron .",
+    "prepare:standalone": "node scripts/prepare-standalone.js",
+    "dist:mac": "npm run build && npm run prepare:standalone && electron-builder --mac",
+    "dist:win": "npm run build && npm run prepare:standalone && electron-builder --win",
+    "dist:linux": "npm run build && npm run prepare:standalone && electron-builder --linux"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
@@ -24,9 +30,35 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.mostafaelkorashy.designvault",
+    "productName": "Design Vault",
+    "asar": false,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/standalone/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.graphics-design"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }

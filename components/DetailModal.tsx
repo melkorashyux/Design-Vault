@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CATEGORIES, UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
 import { matchAllowed } from "@/lib/tags";
 import { ColorSwatch } from "@/components/ColorSwatch";
@@ -62,9 +62,13 @@ export function DetailModal({
   const [colorInput, setColorInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [movingFolder, setMovingFolder] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteState, setDeleteState] = useState<"idle" | "pending" | "confirm">("idle");
+  const [deleteLabel, setDeleteLabel] = useState("delete");
+  const deleteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -75,6 +79,14 @@ export function DetailModal({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, fullscreen]);
+
+  // Clears the scramble interval if the modal unmounts mid-animation
+  // (e.g. Escape closes it while "delete" is still decoding).
+  useEffect(() => {
+    return () => {
+      if (deleteTimerRef.current) clearInterval(deleteTimerRef.current);
+    };
+  }, []);
 
   async function save() {
     setSaving(true);
@@ -129,11 +141,64 @@ export function DetailModal({
     }
   }
 
+  async function handleAnalyze() {
+    setAnalyzeError(null);
+    setAnalyzing(true);
+    try {
+      const res = await fetch(`/api/items/${item.id}/analyze`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || "Analysis failed");
+      }
+      const { item: updated } = await res.json();
+      onUpdated(updated);
+    } catch (err) {
+      setAnalyzeError(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  const CONFIRM_LABEL = "confirm delete";
+  const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const DELETE_HOLD_MS = 2000;
+
+  function startDeleteHold() {
+    setDeleteState("pending");
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!reduceMotion) {
+      const start = performance.now();
+      deleteTimerRef.current = setInterval(() => {
+        const elapsed = performance.now() - start;
+        const lockedCount = Math.floor((elapsed / DELETE_HOLD_MS) * CONFIRM_LABEL.length);
+        let out = "";
+        for (let i = 0; i < CONFIRM_LABEL.length; i++) {
+          out +=
+            i < lockedCount || CONFIRM_LABEL[i] === " "
+              ? CONFIRM_LABEL[i]
+              : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)].toLowerCase();
+        }
+        setDeleteLabel(out);
+      }, 40);
+    }
+
+    setTimeout(() => {
+      if (deleteTimerRef.current) clearInterval(deleteTimerRef.current);
+      setDeleteLabel(CONFIRM_LABEL);
+      setDeleteState("confirm");
+    }, DELETE_HOLD_MS);
+  }
+
   async function handleDelete() {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true);
+    if (deleteState === "idle") {
+      startDeleteHold();
       return;
     }
+    if (deleteState === "pending") return;
     const res = await fetch(`/api/items/${item.id}`, { method: "DELETE" });
     if (res.ok) onDeleted(item.id);
   }
@@ -186,7 +251,7 @@ export function DetailModal({
           </div>
         </div>
 
-        <div className="flex w-full flex-col overflow-y-auto sm:w-1/2">
+        <div className="flex w-full flex-col overflow-hidden sm:w-1/2">
           <div className="flex items-center justify-between border-b border-border p-4">
             {editing ? (
               <input
@@ -197,15 +262,62 @@ export function DetailModal({
             ) : (
               <h2 className="page-heading">{item.title}</h2>
             )}
-            <button
-              onClick={onClose}
-              className="tracked-label ml-4 shrink-0 text-dim hover:text-text"
-            >
-              close
-            </button>
+            <div className="ml-4 flex shrink-0 items-center gap-4">
+              {editing ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setDraft(toDraft(item));
+                      setEditing(false);
+                    }}
+                    className="tracked-label text-dim hover:text-text"
+                  >
+                    cancel
+                  </button>
+                  <button
+                    onClick={save}
+                    disabled={saving}
+                    className="tracked-label border border-accent bg-accent px-3 py-1.5 text-bg disabled:opacity-50"
+                  >
+                    {saving ? "saving…" : "save"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="tracked-label text-dim hover:text-text"
+                  >
+                    edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteState === "pending"}
+                    className={`tracked-label transition-colors duration-150 ${
+                      deleteState === "idle"
+                        ? "text-dim hover:text-red-500"
+                        : deleteState === "confirm"
+                          ? "text-red-500 hover:text-red-700"
+                          : "text-red-500"
+                    } disabled:cursor-default`}
+                  >
+                    {deleteState === "idle" ? "delete" : deleteLabel}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={onClose}
+                title="Close"
+                aria-label="Close"
+                className="text-lg leading-none text-dim hover:text-text"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-6 p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-6 p-4">
             <Field label="Category">
               {editing ? (
                 <select
@@ -389,61 +501,38 @@ export function DetailModal({
             <Field label="Added">
               <p className="text-dim">{new Date(item.created_at).toLocaleDateString()}</p>
             </Field>
-          </div>
-
-          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border p-4">
-            <button
-              onClick={handleDelete}
-              className={`tracked-label border px-3 py-2 transition-colors duration-150 ${
-                confirmingDelete
-                  ? "border-accent bg-accent text-bg"
-                  : "border-border text-dim hover:text-accent"
-              }`}
-            >
-              {confirmingDelete ? "confirm delete" : "delete"}
-            </button>
-
-            <div className="flex items-center gap-3">
-              {!editing && (
-                <button
-                  onClick={handleExport}
-                  className="tracked-label border border-border px-3 py-2 text-dim transition-colors duration-150 hover:text-text"
-                >
-                  export for claude
-                </button>
-              )}
-              {editing ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setDraft(toDraft(item));
-                      setEditing(false);
-                    }}
-                    className="tracked-label px-3 py-2 text-dim hover:text-text"
-                  >
-                    cancel
-                  </button>
-                  <button
-                    onClick={save}
-                    disabled={saving}
-                    className="tracked-label border border-accent bg-accent px-4 py-2 text-bg disabled:opacity-50"
-                  >
-                    {saving ? "saving…" : "save"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="tracked-label border border-border px-4 py-2 transition-colors duration-150 hover:bg-text hover:text-bg"
-                >
-                  edit
-                </button>
-              )}
             </div>
           </div>
+
+          {!editing && (
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-4">
+              <button
+                onClick={handleExport}
+                className="tracked-label border border-border px-3 py-2 text-dim transition-colors duration-150 hover:text-text"
+              >
+                export for claude
+              </button>
+              <button
+                onClick={handleAnalyze}
+                disabled={analyzing}
+                className="tracked-label border border-accent px-3 py-2 text-accent transition-colors duration-150 hover:bg-accent hover:text-bg disabled:opacity-50"
+              >
+                {analyzing
+                  ? "analyzing…"
+                  : item.analysis_status === "pending"
+                    ? "analyze with ai"
+                    : "re-analyze with ai"}
+              </button>
+            </div>
+          )}
           {exportError && (
             <p className="border-t border-border px-4 py-2 text-[11px] text-accent">
               {exportError}
+            </p>
+          )}
+          {analyzeError && (
+            <p className="border-t border-border px-4 py-2 text-[11px] text-accent">
+              {analyzeError}
             </p>
           )}
         </div>

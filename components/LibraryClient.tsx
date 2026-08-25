@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORIES, UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
-import { matchAllowed } from "@/lib/tags";
+import { UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterBar } from "@/components/FilterBar";
 import { FolderSidebar } from "@/components/FolderSidebar";
@@ -13,7 +12,7 @@ import { Lightbox } from "@/components/Lightbox";
 import { ExportToast } from "@/components/ExportToast";
 import { uploadFiles, type UploadTask } from "@/lib/uploadClient";
 import { fetchFolders } from "@/lib/foldersClient";
-import { fetchTags, addTagsApi } from "@/lib/tagsClient";
+import { fetchTags } from "@/lib/tagsClient";
 import { exportForClaude, type ExportResult } from "@/lib/exportClient";
 
 interface PendingUpload {
@@ -44,9 +43,10 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkFolderTarget, setBulkFolderTarget] = useState("");
-  const [bulkCategoryTarget, setBulkCategoryTarget] = useState("");
-  const [bulkTagsInput, setBulkTagsInput] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkDeleteState, setBulkDeleteState] = useState<"idle" | "pending" | "confirm">("idle");
+  const [bulkDeleteLabel, setBulkDeleteLabel] = useState("delete");
+  const bulkDeleteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -165,25 +165,51 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
     );
   }, []);
 
+  // Any change to the selection invalidates a pending/animating "confirm
+  // delete" — safer than letting a stale confirm apply to a different set
+  // of items, and avoids a scramble animation finishing against a count
+  // that's no longer accurate.
+  const resetBulkDelete = useCallback(() => {
+    if (bulkDeleteTimerRef.current) clearInterval(bulkDeleteTimerRef.current);
+    setBulkDeleteState("idle");
+    setBulkDeleteLabel("delete");
+  }, []);
+
   const toggleSelectMode = useCallback(() => {
     setSelectMode((prev) => !prev);
     setSelectedIds(new Set());
-  }, []);
+    resetBulkDelete();
+  }, [resetBulkDelete]);
 
-  const toggleSelected = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleSelected = useCallback(
+    (id: string) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      resetBulkDelete();
+    },
+    [resetBulkDelete],
+  );
 
   const selectAllFiltered = useCallback(() => {
     setSelectedIds(new Set(filtered.map((i) => i.id)));
-  }, [filtered]);
+    resetBulkDelete();
+  }, [filtered, resetBulkDelete]);
 
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    resetBulkDelete();
+  }, [resetBulkDelete]);
+
+  // Clears the scramble interval if the component unmounts mid-animation.
+  useEffect(() => {
+    return () => {
+      if (bulkDeleteTimerRef.current) clearInterval(bulkDeleteTimerRef.current);
+    };
+  }, []);
 
   // Applies a per-item PATCH to every selected item and merges the results
   // back into local state. Selection is left intact afterward so category,
@@ -220,37 +246,59 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
     }
   }
 
-  async function runBulkCategory() {
-    if (!bulkCategoryTarget || selectedIds.size === 0) return;
-    setBulkBusy(true);
-    try {
-      await bulkPatch(Array.from(selectedIds), () => ({ category: bulkCategoryTarget }));
-      setBulkCategoryTarget("");
-    } finally {
-      setBulkBusy(false);
+  const BULK_SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const BULK_DELETE_HOLD_MS = 2000;
+
+  // Same scramble-decode hold as the detail modal's delete button: the label
+  // dissolves into random characters and re-locks into "confirm delete (N)"
+  // over two seconds before the second click can actually delete anything.
+  function startBulkDeleteHold() {
+    setBulkDeleteState("pending");
+    const target = `confirm delete (${selectedIds.size})`;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!reduceMotion) {
+      const start = performance.now();
+      bulkDeleteTimerRef.current = setInterval(() => {
+        const elapsed = performance.now() - start;
+        const lockedCount = Math.floor((elapsed / BULK_DELETE_HOLD_MS) * target.length);
+        let out = "";
+        for (let i = 0; i < target.length; i++) {
+          out +=
+            i < lockedCount || target[i] === " "
+              ? target[i]
+              : BULK_SCRAMBLE_CHARS[Math.floor(Math.random() * BULK_SCRAMBLE_CHARS.length)].toLowerCase();
+        }
+        setBulkDeleteLabel(out);
+      }, 40);
     }
+
+    setTimeout(() => {
+      if (bulkDeleteTimerRef.current) clearInterval(bulkDeleteTimerRef.current);
+      setBulkDeleteLabel(target);
+      setBulkDeleteState("confirm");
+    }, BULK_DELETE_HOLD_MS);
   }
 
-  async function runBulkTags() {
-    const rawTags = bulkTagsInput
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    if (rawTags.length === 0 || selectedIds.size === 0) return;
-    // Snap to an existing tag's casing when one matches case-insensitively
-    // (e.g. typing "dark" reuses "Dark" instead of creating a near-duplicate);
-    // anything that doesn't match yet is a genuinely new tag the user is adding.
-    const newTags = Array.from(
-      new Set(rawTags.map((t) => matchAllowed(t, knownTags) ?? t)),
-    );
+  async function runBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (bulkDeleteState === "idle") {
+      startBulkDeleteHold();
+      return;
+    }
+    if (bulkDeleteState === "pending") return;
+
+    const ids = Array.from(selectedIds);
     setBulkBusy(true);
     try {
-      const updatedTags = await addTagsApi(newTags);
-      setKnownTags(updatedTags);
-      await bulkPatch(Array.from(selectedIds), (item) => ({
-        tags: Array.from(new Set([...item.tags, ...newTags])),
-      }));
-      setBulkTagsInput("");
+      await Promise.all(ids.map((id) => fetch(`/api/items/${id}`, { method: "DELETE" })));
+      setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+      setSelectedIds(new Set());
+      resetBulkDelete();
+      reloadFolders();
     } finally {
       setBulkBusy(false);
     }
@@ -403,28 +451,30 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex border border-border">
-                    <button
-                      onClick={() => pickView("detail")}
-                      className={`tracked-label border-r border-border px-3 py-1.5 transition-colors duration-150 ${
-                        view === "detail"
-                          ? "bg-accent text-bg"
-                          : "text-muted hover:text-text"
-                      }`}
-                    >
-                      detail
-                    </button>
-                    <button
-                      onClick={() => pickView("grid")}
-                      className={`tracked-label px-3 py-1.5 transition-colors duration-150 ${
-                        view === "grid"
-                          ? "bg-accent text-bg"
-                          : "text-muted hover:text-text"
-                      }`}
-                    >
-                      grid
-                    </button>
-                  </div>
+                  {!selectMode && (
+                    <div className="flex border border-border">
+                      <button
+                        onClick={() => pickView("detail")}
+                        className={`tracked-label border-r border-border bg-surface px-3 py-1.5 transition-colors duration-150 ${
+                          view === "detail"
+                            ? "text-accent"
+                            : "text-muted hover:text-text"
+                        }`}
+                      >
+                        detail
+                      </button>
+                      <button
+                        onClick={() => pickView("grid")}
+                        className={`tracked-label bg-surface px-3 py-1.5 transition-colors duration-150 ${
+                          view === "grid"
+                            ? "text-accent"
+                            : "text-muted hover:text-text"
+                        }`}
+                      >
+                        grid
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={toggleSelectMode}
                     className={`tracked-label border px-3 py-1.5 transition-colors duration-150 ${
@@ -435,12 +485,14 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                   >
                     {selectMode ? "cancel" : "select"}
                   </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg"
-                  >
-                    + Add
-                  </button>
+                  {!selectMode && (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg"
+                    >
+                      + Add
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -448,75 +500,51 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                 <div className="mt-4 flex flex-col gap-3 border border-accent bg-surface px-4 py-3">
                   <p className="tracked-label text-accent">{selectedIds.size} selected</p>
 
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={bulkCategoryTarget}
-                        onChange={(e) => setBulkCategoryTarget(e.target.value)}
-                        disabled={bulkBusy}
-                        className="border border-border bg-bg px-2 py-1 disabled:opacity-50"
-                      >
-                        <option value="">category…</option>
-                        {CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={runBulkCategory}
-                        disabled={!bulkCategoryTarget || bulkBusy}
-                        className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg disabled:opacity-50"
-                      >
-                        set
-                      </button>
-                    </div>
+                  <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={bulkFolderTarget}
+                          onChange={(e) => setBulkFolderTarget(e.target.value)}
+                          disabled={bulkBusy}
+                          className="border border-border bg-bg px-2 py-1 disabled:opacity-50"
+                        >
+                          <option value="">move to…</option>
+                          {folders.map((folder) => (
+                            <option key={folder.id} value={folder.id}>
+                              {folder.name === UNSORTED_FOLDER_NAME ? "Unsorted" : folder.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={runBulkMove}
+                          disabled={!bulkFolderTarget || bulkBusy}
+                          className="tracked-label border border-accent bg-accent px-3 py-1.5 text-bg disabled:opacity-50"
+                        >
+                          {bulkBusy ? "…" : "move"}
+                        </button>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        value={bulkTagsInput}
-                        onChange={(e) => setBulkTagsInput(e.target.value)}
-                        disabled={bulkBusy}
-                        placeholder="tag, tag, tag"
-                        className="w-36 border-b border-border pb-1 placeholder:text-dim disabled:opacity-50"
-                      />
                       <button
-                        onClick={runBulkTags}
-                        disabled={!bulkTagsInput.trim() || bulkBusy}
-                        className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg disabled:opacity-50"
+                        onClick={() => runExport(Array.from(selectedIds))}
+                        className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg"
                       >
-                        add tags
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={bulkFolderTarget}
-                        onChange={(e) => setBulkFolderTarget(e.target.value)}
-                        disabled={bulkBusy}
-                        className="border border-border bg-bg px-2 py-1 disabled:opacity-50"
-                      >
-                        <option value="">move to…</option>
-                        {folders.map((folder) => (
-                          <option key={folder.id} value={folder.id}>
-                            {folder.name === UNSORTED_FOLDER_NAME ? "Unsorted" : folder.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={runBulkMove}
-                        disabled={!bulkFolderTarget || bulkBusy}
-                        className="tracked-label border border-accent bg-accent px-3 py-1.5 text-bg disabled:opacity-50"
-                      >
-                        {bulkBusy ? "…" : "move"}
+                        export for claude
                       </button>
                     </div>
 
                     <button
-                      onClick={() => runExport(Array.from(selectedIds))}
-                      className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg"
+                      onClick={runBulkDelete}
+                      disabled={bulkDeleteState === "pending" || bulkBusy}
+                      className={`tracked-label border px-3 py-1.5 transition-colors duration-150 disabled:cursor-default disabled:opacity-50 ${
+                        bulkDeleteState === "idle"
+                          ? "border-border text-dim hover:border-red-500 hover:text-red-500"
+                          : bulkDeleteState === "confirm"
+                            ? "border-red-500 text-red-500 hover:border-red-700 hover:text-red-700"
+                            : "border-red-500 text-red-500"
+                      }`}
                     >
-                      export for claude
+                      {bulkBusy ? "…" : bulkDeleteState === "idle" ? "delete" : bulkDeleteLabel}
                     </button>
                   </div>
                   {exportError && <p className="text-[11px] text-accent">{exportError}</p>}

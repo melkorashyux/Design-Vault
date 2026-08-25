@@ -6,10 +6,8 @@ import {
   withAnalysisRetry,
 } from "@/lib/analysis-shared";
 import { listTags } from "@/lib/db";
+import { getSettings } from "@/lib/settings";
 import type { AnalysisResult } from "@/lib/types";
-
-const HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
-const MODEL = process.env.OLLAMA_MODEL || "gemma3:4b";
 
 interface OllamaChatResponse {
   message?: { content?: string };
@@ -19,12 +17,13 @@ async function callOllama(
   imageBase64: string,
   allowedTags: string[],
 ): Promise<AnalysisResult | null> {
-  const res = await fetch(`${HOST}/api/chat`, {
+  const { ollamaHost, ollamaModel } = getSettings();
+  const res = await fetch(`${ollamaHost}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: AbortSignal.timeout(120_000),
     body: JSON.stringify({
-      model: MODEL,
+      model: ollamaModel,
       stream: false,
       format: "json",
       messages: [

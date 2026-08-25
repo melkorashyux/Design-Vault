@@ -43,6 +43,13 @@ yarn-error.log*
 !/data/uploads/__placeholder-*.svg
 /data/exports/
 
+# per-install settings (holds the Anthropic API key)
+/data/settings.json
+
+# electron packaging output
+/release/
+/electron/node_modules/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

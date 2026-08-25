@@ -7,13 +7,16 @@ import {
   withAnalysisRetry,
 } from "@/lib/analysis-shared";
 import { listTags } from "@/lib/db";
+import { getSettings } from "@/lib/settings";
 import type { AnalysisResult } from "@/lib/types";
 
-const MODEL = process.env.ANALYSIS_MODEL || "claude-sonnet-5";
-
 let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!client) client = new Anthropic();
+let clientKey: string | null = null;
+function getClient(apiKey: string): Anthropic {
+  if (!client || clientKey !== apiKey) {
+    client = new Anthropic({ apiKey });
+    clientKey = apiKey;
+  }
   return client;
 }
 
@@ -22,8 +25,9 @@ async function callClaude(
   mediaType: string,
   allowedTags: string[],
 ): Promise<AnalysisResult | null> {
-  const message = await getClient().messages.create({
-    model: MODEL,
+  const { anthropicApiKey, analysisModel } = getSettings();
+  const message = await getClient(anthropicApiKey).messages.create({
+    model: analysisModel,
     max_tokens: 1024,
     system: buildSystemPrompt(allowedTags),
     messages: [
