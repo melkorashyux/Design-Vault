@@ -3,6 +3,11 @@ const path = require("path");
 const http = require("http");
 const { spawn } = require("child_process");
 
+// Sets the userData folder name (~/Library/Application Support/Visual Brain
+// on macOS) — must run before any app.getPath("userData") call, since
+// Electron derives the default path from app.name the first time it's read.
+app.setName("Visual Brain");
+
 const PORT = 3000;
 const URL = `http://localhost:${PORT}`;
 
@@ -37,6 +42,12 @@ function startServer() {
     const standaloneDir = path.join(process.resourcesPath, "app", ".next", "standalone");
     const serverScript = path.join(standaloneDir, "server.js");
 
+    // The bundle itself (including its cwd) is replaced wholesale on every
+    // reinstall/update, so the db/uploads must live outside it — in
+    // Electron's persistent userData directory — or every update would wipe
+    // the library. See the matching env read in lib/db.ts and lib/settings.ts.
+    const dataDir = path.join(app.getPath("userData"), "data");
+
     serverProcess = spawn(process.execPath, [serverScript], {
       cwd: standaloneDir,
       stdio: "inherit",
@@ -45,6 +56,7 @@ function startServer() {
         ELECTRON_RUN_AS_NODE: "1",
         PORT: String(PORT),
         HOSTNAME: "localhost",
+        VISUAL_BRAIN_DATA_DIR: dataDir,
       },
     });
   }

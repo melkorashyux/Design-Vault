@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// See the matching comment in lib/db.ts — same override for the packaged app.
+const DATA_DIR = process.env.VISUAL_BRAIN_DATA_DIR || path.join(process.cwd(), "data");
 const SETTINGS_PATH = path.join(DATA_DIR, "settings.json");
 
 export interface BrainSettings {

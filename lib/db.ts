@@ -13,7 +13,11 @@ import {
 } from "@/lib/types";
 import { migrateTaxonomy } from "@/lib/taxonomyMigration";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// In the packaged desktop app, electron/main.js points this at a directory
+// outside the app bundle (Electron's userData path) so the library survives
+// reinstalls/updates — the bundle itself is replaced wholesale on every
+// build. Falls back to a project-relative folder for `npm run dev`/`start`.
+const DATA_DIR = process.env.VISUAL_BRAIN_DATA_DIR || path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "visual-brain.db");
 
 fs.mkdirSync(path.join(DATA_DIR, "uploads"), { recursive: true });
