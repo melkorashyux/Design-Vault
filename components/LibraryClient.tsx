@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
+import { UNSORTED_FOLDER_NAME, type Folder, type BrainItem } from "@/lib/types";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterBar } from "@/components/FilterBar";
 import { FolderSidebar } from "@/components/FolderSidebar";
@@ -22,10 +22,10 @@ interface PendingUpload {
   message?: string;
 }
 
-const VIEW_STORAGE_KEY = "vault-view";
+const VIEW_STORAGE_KEY = "visual-brain-view";
 
-export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
-  const [items, setItems] = useState<VaultItem[]>(initialItems);
+export function LibraryClient({ initialItems }: { initialItems: BrainItem[] }) {
+  const [items, setItems] = useState<BrainItem[]>(initialItems);
   const [folders, setFolders] = useState<Folder[]>([]);
   // The registry of all known tags (seeded + user-added) — the single source
   // of truth shared with the Ollama/Claude prompt, independent of which tags
@@ -37,8 +37,8 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [selected, setSelected] = useState<VaultItem | null>(null);
-  const [lightboxItem, setLightboxItem] = useState<VaultItem | null>(null);
+  const [selected, setSelected] = useState<BrainItem | null>(null);
+  const [lightboxItem, setLightboxItem] = useState<BrainItem | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -66,7 +66,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
   const reloadItems = useCallback(() => {
     fetch("/api/items")
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-      .then((data: { items: VaultItem[] }) => setItems(data.items))
+      .then((data: { items: BrainItem[] }) => setItems(data.items))
       .catch(() => {});
   }, []);
 
@@ -215,7 +215,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
   // back into local state. Selection is left intact afterward so category,
   // tags, and folder can all be assigned in one pass over the same batch.
   const bulkPatch = useCallback(
-    async (ids: string[], buildPayload: (item: VaultItem) => Record<string, unknown>) => {
+    async (ids: string[], buildPayload: (item: BrainItem) => Record<string, unknown>) => {
       const targets = items.filter((i) => ids.includes(i.id));
       const results = await Promise.all(
         targets.map(async (item) => {
@@ -226,7 +226,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
           });
           if (!res.ok) return null;
           const { item: updated } = await res.json();
-          return updated as VaultItem;
+          return updated as BrainItem;
         }),
       );
       setItems((prev) => prev.map((item) => results.find((r) => r?.id === item.id) ?? item));
@@ -381,7 +381,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
       />
 
       <h1 className="hero-heading">
-        Visual Vault
+        Visual Brain
       </h1>
 
       <div className="mt-10 flex flex-col gap-8 sm:flex-row">
@@ -412,7 +412,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                 dragOver ? "border-accent" : "border-border"
               }`}
             >
-              <p className="tracked-label text-dim">Vault is empty</p>
+              <p className="tracked-label text-dim">Visual Brain is empty</p>
               <p className="max-w-xs text-muted">
                 Drop in screenshots of designs you like — Claude will title, tag, and explain
                 each one.
@@ -488,7 +488,7 @@ export function LibraryClient({ initialItems }: { initialItems: VaultItem[] }) {
                   {!selectMode && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="tracked-label border border-border px-3 py-1.5 transition-colors duration-150 hover:bg-text hover:text-bg"
+                      className="tracked-label border border-accent bg-accent px-3 py-1.5 text-bg"
                     >
                       + Add
                     </button>

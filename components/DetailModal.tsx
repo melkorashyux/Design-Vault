@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CATEGORIES, UNSORTED_FOLDER_NAME, type Folder, type VaultItem } from "@/lib/types";
+import { CATEGORIES, UNSORTED_FOLDER_NAME, type Folder, type BrainItem } from "@/lib/types";
 import { matchAllowed } from "@/lib/tags";
 import { ColorSwatch } from "@/components/ColorSwatch";
 import { ExportToast } from "@/components/ExportToast";
@@ -22,7 +22,7 @@ interface Draft {
   source_url: string;
 }
 
-function toDraft(item: VaultItem): Draft {
+function toDraft(item: BrainItem): Draft {
   return {
     title: item.title,
     category: item.category,
@@ -45,14 +45,14 @@ export function DetailModal({
   onUpdated,
   onDeleted,
 }: {
-  item: VaultItem;
+  item: BrainItem;
   folders: Folder[];
   /** The full tag registry — used to snap a typed tag to its existing casing. */
   tags: string[];
   /** Called with the updated registry after a genuinely new tag is registered. */
   onTagsChanged: (tags: string[]) => void;
   onClose: () => void;
-  onUpdated: (item: VaultItem) => void;
+  onUpdated: (item: BrainItem) => void;
   onDeleted: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);

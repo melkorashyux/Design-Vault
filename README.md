@@ -1,4 +1,4 @@
-# Vault
+# Visual Brain
 
 A local-first design inspiration library. Drop in screenshots of designs you like, or use the Chrome extension to right click on any photo and add to your library;
 Claude (vision) auto-titles, categorizes, tags, and writes design notes for each one.
@@ -40,9 +40,9 @@ are noticeably weaker than Claude at this task (nuanced tags, naming aesthetic
 movements, staying in valid JSON), so expect lower-quality results in exchange for
 running fully offline.
 
-`.env.local` also comes with a `VAULT_TOKEN` already generated (and mirrored as
-`NEXT_PUBLIC_VAULT_TOKEN` for the web UI itself). This is the secret the Chrome
-extension authenticates with — see [Chrome extension](#chrome-extension-save-to-vault)
+`.env.local` also comes with a `VISUAL_BRAIN_TOKEN` already generated (and mirrored as
+`NEXT_PUBLIC_VISUAL_BRAIN_TOKEN` for the web UI itself). This is the secret the Chrome
+extension authenticates with — see [Chrome extension](#chrome-extension-save-to-visual-brain)
 below. It's specific to your machine and lives only in `.env.local` (gitignored) —
 never commit it or paste it into this file.
 
@@ -52,21 +52,21 @@ Generate your own any time with:
 node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 ```
 
-and paste the value into both `VAULT_TOKEN` and `NEXT_PUBLIC_VAULT_TOKEN` in `.env.local`.
+and paste the value into both `VISUAL_BRAIN_TOKEN` and `NEXT_PUBLIC_VISUAL_BRAIN_TOKEN` in `.env.local`.
 
 ## Where data lives
 
-- `data/vault.db` — SQLite database (items, folders — metadata only, no image bytes)
+- `data/visual-brain.db` — SQLite database (items, folders — metadata only, no image bytes)
 - `data/uploads/` — the actual screenshot/image files, referenced by filename from the db
 
 Both are gitignored except for three seed placeholder SVGs used to populate the library
-on first run. Deleting `data/vault.db` resets your library (images in `data/uploads`
+on first run. Deleting `data/visual-brain.db` resets your library (images in `data/uploads`
 are untouched but become orphaned).
 
 ## How it works
 
 1. Drop screenshots onto the Library page or the Add page, or right-click any image on
-   the web and save it via the [Chrome extension](#chrome-extension-save-to-vault).
+   the web and save it via the [Chrome extension](#chrome-extension-save-to-visual-brain).
 2. Each image is saved to `data/uploads/`, sent to Claude with a design-librarian system
    prompt, and the returned JSON (title, category, tags, description, design notes,
    dominant colors, typography, layout) is stored as a row in SQLite.
@@ -86,7 +86,7 @@ folders from the sidebar on the Library page (create, rename, delete — deletin
 folder moves its items to Unsorted rather than deleting them; Unsorted itself can't be
 renamed or deleted).
 
-## Chrome extension (Save to Vault)
+## Chrome extension (Save to Visual Brain)
 
 A Manifest V3 extension in `./extension/` lets you right-click any image on the web,
 pick a folder, and have it saved and analyzed exactly like an upload.
@@ -96,11 +96,11 @@ pick a folder, and have it saved and analyzed exactly like an upload.
 1. Make sure `npm run dev` is running — the extension talks to `http://localhost:3000`.
 2. Open `chrome://extensions`, enable **Developer mode** (top right).
 3. Click **Load unpacked**, select the `extension/` folder.
-4. Click the extension's icon in the toolbar to open its popup, paste your `VAULT_TOKEN`
-   (see above) into **Vault Token**, and click **Test Connection** to confirm it can
-   reach the vault.
+4. Click the extension's icon in the toolbar to open its popup, paste your `VISUAL_BRAIN_TOKEN`
+   (see above) into **Visual Brain Token**, and click **Test Connection** to confirm it can
+   reach Visual Brain.
 
-**Use it:** right-click any image on any page → **Save to Vault** → pick a folder. A
+**Use it:** right-click any image on any page → **Save to Visual Brain** → pick a folder. A
 notification confirms the save, and the image shows up in your Library within a few
 seconds, auto-titled and tagged like everything else. Create new folders from the
 popup — the right-click menu updates immediately, no reinstall needed.
@@ -119,7 +119,7 @@ exact match against `chrome-extension://<your-extension-id>`.
 - `POST /api/ingest` — save + analyze `{ imageBase64, mediaType, folderId, sourceUrl, pageUrl }`
   (or `{ sourceUrl, pageUrl }` alone — the server fetches the image itself)
 
-All four require an `X-Vault-Token` header matching `VAULT_TOKEN`.
+All four require an `X-Visual-Brain-Token` header matching `VISUAL_BRAIN_TOKEN`.
 
 ## Stack
 

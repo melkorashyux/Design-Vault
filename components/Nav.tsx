@@ -4,15 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 
-const links = [
-  { href: "/", label: "Library" },
-  { href: "/add", label: "Add" },
-  { href: "/settings", label: "Settings" },
-  { href: "/devtools", label: "Dev Tools" },
-];
-
 export function Nav() {
   const pathname = usePathname();
+  const settingsActive = pathname === "/settings";
 
   return (
     <header className="border-b border-border">
@@ -21,20 +15,14 @@ export function Nav() {
           <Logo />
         </Link>
         <nav className="flex items-center gap-8">
-          {links.map((link) => {
-            const active = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`tracked-label transition-colors duration-150 ${
-                  active ? "text-accent" : "text-muted hover:text-text"
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
+          <Link
+            href="/settings"
+            className={`tracked-label transition-colors duration-150 ${
+              settingsActive ? "text-accent" : "text-muted hover:text-text"
+            }`}
+          >
+            Settings
+          </Link>
         </nav>
       </div>
     </header>

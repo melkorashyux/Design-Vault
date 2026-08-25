@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Save to Vault",
+  "name": "Save to Visual Brain",
   "version": "1.0.0",
-  "description": "Right-click any image on the web, pick a folder, and save it to your local Design Vault — auto-titled, categorized, and tagged by Claude.",
+  "description": "Right-click any image on the web, pick a folder, and save it to your local Visual Brain — auto-titled, categorized, and tagged by Claude.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Save to Vault</title>
+    <title>Save to Visual Brain</title>
     <style>
       :root {
         color-scheme: dark;
@@ -28,14 +28,7 @@
       h1 .mark {
         width: 16px;
         height: 16px;
-        background: #ededed;
-        color: #0a0a0a;
-        border-radius: 4px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 11px;
+        display: block;
       }
       label {
         display: block;
@@ -119,13 +112,13 @@
     </style>
   </head>
   <body>
-    <h1><span class="mark">V</span> Save to Vault</h1>
+    <h1><img class="mark" src="icons/icon48.png" alt="" /> Save to Visual Brain</h1>
 
-    <label for="vaultUrl">Vault URL</label>
-    <input id="vaultUrl" type="text" placeholder="http://localhost:3000" />
+    <label for="brainUrl">Visual Brain URL</label>
+    <input id="brainUrl" type="text" placeholder="http://localhost:3000" />
 
-    <label for="vaultToken">Vault Token</label>
-    <input id="vaultToken" type="password" placeholder="paste VAULT_TOKEN from .env.local" />
+    <label for="brainToken">Visual Brain Token</label>
+    <input id="brainToken" type="password" placeholder="paste VISUAL_BRAIN_TOKEN from .env.local" />
 
     <button id="test">Test Connection</button>
     <div id="status"></div>
@@ -138,7 +131,7 @@
       <button id="createFolder">Add</button>
     </div>
     <div id="folderStatus"></div>
-    <p class="hint">Right-click any image → Save to Vault → pick a folder.</p>
+    <p class="hint">Right-click any image → Save to Visual Brain → pick a folder.</p>
 
     <script type="module" src="popup.js"></script>
   </body>

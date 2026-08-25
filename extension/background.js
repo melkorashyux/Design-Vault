@@ -1,9 +1,9 @@
 import { apiFetch, fetchFolders } from "./shared.js";
 
-const MENU_ROOT = "save-to-vault";
-const MENU_REFRESH = "save-to-vault-refresh";
-const MENU_NEW_FOLDER = "save-to-vault-new-folder";
-const MENU_ERROR = "save-to-vault-error";
+const MENU_ROOT = "save-to-visual-brain";
+const MENU_REFRESH = "save-to-visual-brain-refresh";
+const MENU_NEW_FOLDER = "save-to-visual-brain-new-folder";
+const MENU_ERROR = "save-to-visual-brain-error";
 const FOLDER_PREFIX = "folder:";
 
 const SUPPORTED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -16,7 +16,7 @@ async function rebuildMenu() {
 
   chrome.contextMenus.create({
     id: MENU_ROOT,
-    title: "Save to Vault",
+    title: "Save to Visual Brain",
     contexts: ["image"],
   });
 
@@ -27,7 +27,7 @@ async function rebuildMenu() {
     chrome.contextMenus.create({
       id: MENU_ERROR,
       parentId: MENU_ROOT,
-      title: "⚠ Can't reach vault — open popup to fix settings",
+      title: "⚠ Can't reach Visual Brain — open popup to fix settings",
       contexts: ["image"],
       enabled: false,
     });
@@ -44,7 +44,7 @@ async function rebuildMenu() {
 
   if (folders.length > 0) {
     chrome.contextMenus.create({
-      id: "save-to-vault-sep",
+      id: "save-to-visual-brain-sep",
       parentId: MENU_ROOT,
       type: "separator",
       contexts: ["image"],
@@ -154,8 +154,8 @@ async function saveImage(info, folderId, tab) {
     if (!res.ok) throw new Error(body.error || `Save failed (${res.status})`);
 
     const folders = await fetchFolders().catch(() => []);
-    const folderName = folders.find((f) => f.id === folderId)?.name ?? "Vault";
-    notify("Saved to Vault ✓", `Added to ${folderName}`);
+    const folderName = folders.find((f) => f.id === folderId)?.name ?? "Visual Brain";
+    notify("Saved to Visual Brain ✓", `Added to ${folderName}`);
   } catch (err) {
     notify("Save failed", err instanceof Error ? err.message : "Unknown error");
   }

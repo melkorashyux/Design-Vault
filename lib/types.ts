@@ -48,7 +48,7 @@ export const SEED_TAGS = [
 // vision model hasn't written real title/tags/etc. yet — see lib/ingest.ts.
 export type AnalysisStatus = "pending" | "complete";
 
-export interface VaultItem {
+export interface BrainItem {
   id: string;
   filename: string;
   title: string;
@@ -66,7 +66,7 @@ export interface VaultItem {
 }
 
 // Raw shape as stored in SQLite (tags/colors as JSON strings)
-export interface VaultItemRow {
+export interface BrainItemRow {
   id: string;
   filename: string;
   title: string;
@@ -92,7 +92,7 @@ export interface Folder {
   item_count: number;
 }
 
-export function rowToItem(row: VaultItemRow): VaultItem {
+export function rowToItem(row: BrainItemRow): BrainItem {
   return {
     ...row,
     tags: JSON.parse(row.tags || "[]"),

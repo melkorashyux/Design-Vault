@@ -6,17 +6,17 @@ import { NextRequest, NextResponse } from "next/server";
  * the request is authorized.
  */
 export function requireToken(req: NextRequest): NextResponse | null {
-  const token = process.env.VAULT_TOKEN;
+  const token = process.env.VISUAL_BRAIN_TOKEN;
   if (!token) {
     return NextResponse.json(
-      { error: "Server misconfigured: VAULT_TOKEN is not set in .env.local" },
+      { error: "Server misconfigured: VISUAL_BRAIN_TOKEN is not set in .env.local" },
       { status: 500 },
     );
   }
 
-  const header = req.headers.get("x-vault-token");
+  const header = req.headers.get("x-visual-brain-token");
   if (header !== token) {
-    return NextResponse.json({ error: "Invalid or missing X-Vault-Token header" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid or missing X-Visual-Brain-Token header" }, { status: 401 });
   }
 
   return null;

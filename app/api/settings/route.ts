@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, saveSettings, type VaultSettings } from "@/lib/settings";
+import { getSettings, saveSettings, type BrainSettings } from "@/lib/settings";
 
 function maskKey(key: string): string {
   if (!key) return "";
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const partial: Partial<VaultSettings> = {};
+  const partial: Partial<BrainSettings> = {};
 
   if (body.analysisProvider === "anthropic" || body.analysisProvider === "ollama") {
     partial.analysisProvider = body.analysisProvider;

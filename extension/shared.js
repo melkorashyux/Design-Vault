@@ -1,10 +1,10 @@
-export const DEFAULT_VAULT_URL = "http://localhost:3000";
+export const DEFAULT_VISUAL_BRAIN_URL = "http://localhost:3000";
 
 export async function getSettings() {
-  const { vaultUrl, vaultToken } = await chrome.storage.local.get(["vaultUrl", "vaultToken"]);
+  const { brainUrl, brainToken } = await chrome.storage.local.get(["brainUrl", "brainToken"]);
   return {
-    vaultUrl: vaultUrl || DEFAULT_VAULT_URL,
-    vaultToken: vaultToken || "",
+    brainUrl: brainUrl || DEFAULT_VISUAL_BRAIN_URL,
+    brainToken: brainToken || "",
   };
 }
 
@@ -13,12 +13,12 @@ export async function setSettings(partial) {
 }
 
 export async function apiFetch(path, options = {}) {
-  const { vaultUrl, vaultToken } = await getSettings();
-  return fetch(`${vaultUrl}${path}`, {
+  const { brainUrl, brainToken } = await getSettings();
+  return fetch(`${brainUrl}${path}`, {
     ...options,
     headers: {
       ...(options.headers || {}),
-      "X-Vault-Token": vaultToken,
+      "X-Visual-Brain-Token": brainToken,
     },
   });
 }

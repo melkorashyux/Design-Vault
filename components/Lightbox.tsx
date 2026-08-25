@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { VaultItem } from "@/lib/types";
+import type { BrainItem } from "@/lib/types";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 6;
@@ -14,7 +14,7 @@ const DRAG_THRESHOLD = 4;
 
 type Offset = { x: number; y: number };
 
-export function Lightbox({ item, onClose }: { item: VaultItem; onClose: () => void }) {
+export function Lightbox({ item, onClose }: { item: BrainItem; onClose: () => void }) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);

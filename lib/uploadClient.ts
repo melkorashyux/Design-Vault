@@ -1,4 +1,4 @@
-import type { VaultItem } from "@/lib/types";
+import type { BrainItem } from "@/lib/types";
 
 const CONCURRENCY = 3;
 
@@ -9,11 +9,11 @@ export interface UploadTask {
 
 export interface UploadCallbacks {
   onStart?: (task: UploadTask, index: number) => void;
-  onDone?: (task: UploadTask, index: number, item: VaultItem) => void;
+  onDone?: (task: UploadTask, index: number, item: BrainItem) => void;
   onError?: (task: UploadTask, index: number, error: string) => void;
 }
 
-async function uploadOne(task: UploadTask): Promise<VaultItem> {
+async function uploadOne(task: UploadTask): Promise<BrainItem> {
   const form = new FormData();
   form.append("file", task.file);
   if (task.sourceUrl) form.append("source_url", task.sourceUrl);
@@ -24,7 +24,7 @@ async function uploadOne(task: UploadTask): Promise<VaultItem> {
     throw new Error(body.error || `Upload failed (${res.status})`);
   }
   const { item } = await res.json();
-  return item as VaultItem;
+  return item as BrainItem;
 }
 
 /** Uploads + analyzes files with a small concurrency limit, reporting progress per item. */

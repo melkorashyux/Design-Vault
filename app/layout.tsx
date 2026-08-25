@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, JetBrains_Mono, Space_Mono, Roboto_Mono } from "next/font/google";
+import { IBM_Plex_Mono, JetBrains_Mono, Space_Mono, Roboto_Mono, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { GrainOverlay } from "@/components/GrainOverlay";
 import {
@@ -33,8 +33,14 @@ const robotoMono = Roboto_Mono({
   weight: ["400", "500", "600", "700"],
 });
 
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  weight: ["800"],
+});
+
 export const metadata: Metadata = {
-  title: "Visual Vault",
+  title: "Visual Brain",
   description: "A local-first library of design references, auto-categorized by Claude.",
 };
 
@@ -69,7 +75,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${plexMono.variable} ${jetbrainsMono.variable} ${spaceMono.variable} ${robotoMono.variable} h-full antialiased`}
+      className={`${plexMono.variable} ${jetbrainsMono.variable} ${spaceMono.variable} ${robotoMono.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

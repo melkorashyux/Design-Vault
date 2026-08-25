@@ -95,15 +95,12 @@ body {
 
 /* Library page hero. --hero-scale is a multiplier (Dev Tools header-size picker). */
 .hero-heading {
-  font-weight: 700;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 800;
   text-transform: uppercase;
   line-height: 1.05;
-  letter-spacing: 0.02em;
-  font-size: clamp(
-    calc(22px * var(--hero-scale)),
-    calc(4.2vw * var(--hero-scale)),
-    calc(44px * var(--hero-scale))
-  );
+  letter-spacing: -0.05em;
+  font-size: calc(48px * var(--hero-scale));
 }
 
 .stepped-heading > span:nth-child(1) {

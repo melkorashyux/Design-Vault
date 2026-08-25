@@ -1,8 +1,8 @@
 import type { Folder } from "@/lib/types";
 
 function authHeaders(): HeadersInit {
-  const token = process.env.NEXT_PUBLIC_VAULT_TOKEN;
-  return token ? { "X-Vault-Token": token } : {};
+  const token = process.env.NEXT_PUBLIC_VISUAL_BRAIN_TOKEN;
+  return token ? { "X-Visual-Brain-Token": token } : {};
 }
 
 async function unwrap<T>(res: Response, key: string): Promise<T> {

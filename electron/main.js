@@ -60,7 +60,7 @@ function createWindow() {
     height: 900,
     minWidth: 960,
     minHeight: 600,
-    title: "Design Vault",
+    title: "Visual Brain",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

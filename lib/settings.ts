@@ -4,7 +4,7 @@ import path from "node:path";
 const DATA_DIR = path.join(process.cwd(), "data");
 const SETTINGS_PATH = path.join(DATA_DIR, "settings.json");
 
-export interface VaultSettings {
+export interface BrainSettings {
   analysisProvider: "anthropic" | "ollama";
   anthropicApiKey: string;
   analysisModel: string;
@@ -12,7 +12,7 @@ export interface VaultSettings {
   ollamaModel: string;
 }
 
-const DEFAULTS: VaultSettings = {
+const DEFAULTS: BrainSettings = {
   analysisProvider: process.env.ANALYSIS_PROVIDER === "ollama" ? "ollama" : "anthropic",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   analysisModel: process.env.ANALYSIS_MODEL || "claude-sonnet-5",
@@ -20,7 +20,7 @@ const DEFAULTS: VaultSettings = {
   ollamaModel: process.env.OLLAMA_MODEL || "gemma3:4b",
 };
 
-let cached: VaultSettings | null = null;
+let cached: BrainSettings | null = null;
 
 /**
  * Local per-install settings (analysis provider, API key, model). Backed by
@@ -29,7 +29,7 @@ let cached: VaultSettings | null = null;
  * Falls back to env vars on first read so an existing dev .env.local still
  * works without visiting the settings screen.
  */
-export function getSettings(): VaultSettings {
+export function getSettings(): BrainSettings {
   if (cached) return cached;
 
   if (fs.existsSync(SETTINGS_PATH)) {
@@ -46,7 +46,7 @@ export function getSettings(): VaultSettings {
   return cached;
 }
 
-export function saveSettings(partial: Partial<VaultSettings>): VaultSettings {
+export function saveSettings(partial: Partial<BrainSettings>): BrainSettings {
   const next = { ...getSettings(), ...partial };
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(SETTINGS_PATH, JSON.stringify(next, null, 2));

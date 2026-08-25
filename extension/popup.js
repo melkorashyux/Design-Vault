@@ -1,7 +1,7 @@
 import { getSettings, setSettings, fetchFolders, createFolder } from "./shared.js";
 
-const vaultUrlInput = document.getElementById("vaultUrl");
-const vaultTokenInput = document.getElementById("vaultToken");
+const brainUrlInput = document.getElementById("brainUrl");
+const brainTokenInput = document.getElementById("brainToken");
 const testBtn = document.getElementById("test");
 const statusEl = document.getElementById("status");
 const newFolderInput = document.getElementById("newFolder");
@@ -9,21 +9,21 @@ const createFolderBtn = document.getElementById("createFolder");
 const folderStatusEl = document.getElementById("folderStatus");
 
 async function init() {
-  const { vaultUrl, vaultToken } = await getSettings();
-  vaultUrlInput.value = vaultUrl;
-  vaultTokenInput.value = vaultToken;
+  const { brainUrl, brainToken } = await getSettings();
+  brainUrlInput.value = brainUrl;
+  brainTokenInput.value = brainToken;
 }
 init();
 
 async function persist() {
   await setSettings({
-    vaultUrl: vaultUrlInput.value.trim() || "http://localhost:3000",
-    vaultToken: vaultTokenInput.value.trim(),
+    brainUrl: brainUrlInput.value.trim() || "http://localhost:3000",
+    brainToken: brainTokenInput.value.trim(),
   });
 }
 
-vaultUrlInput.addEventListener("change", persist);
-vaultTokenInput.addEventListener("change", persist);
+brainUrlInput.addEventListener("change", persist);
+brainTokenInput.addEventListener("change", persist);
 
 testBtn.addEventListener("click", async () => {
   await persist();

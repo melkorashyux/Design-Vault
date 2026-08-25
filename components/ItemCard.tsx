@@ -1,6 +1,6 @@
 "use client";
 
-import type { VaultItem } from "@/lib/types";
+import type { BrainItem } from "@/lib/types";
 
 export function ItemCard({
   item,
@@ -11,7 +11,7 @@ export function ItemCard({
   onToggleSelect,
   view = "detail",
 }: {
-  item: VaultItem;
+  item: BrainItem;
   onClick: () => void;
   onExpand?: () => void;
   selectMode?: boolean;

@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { createItem, updateItem } from "@/lib/db";
 import { analyzeScreenshot } from "@/lib/analysis";
 import { FALLBACK_CATEGORY } from "@/lib/analysis-shared";
-import type { VaultItem } from "@/lib/types";
+import type { BrainItem } from "@/lib/types";
 
 const UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
 
@@ -34,7 +34,7 @@ export interface SaveAndAnalyzeInput {
  * particular can take up to two minutes). The real analysis runs afterward
  * in the background and overwrites the row in place once it resolves.
  */
-export async function saveAndAnalyze(input: SaveAndAnalyzeInput): Promise<VaultItem> {
+export async function saveAndAnalyze(input: SaveAndAnalyzeInput): Promise<BrainItem> {
   const ext = EXT_BY_MIME[input.mediaType];
   if (!ext) throw new Error(`Unsupported image type: ${input.mediaType}`);
 

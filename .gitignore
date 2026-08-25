@@ -17,9 +17,6 @@
 /.next/
 /out/
 
-# production
-/build
-
 # misc
 .DS_Store
 *.pem
@@ -37,8 +34,8 @@ yarn-error.log*
 .vercel
 
 # local sqlite db + uploaded screenshots
-/data/vault.db
-/data/vault.db-*
+/data/visual-brain.db
+/data/visual-brain.db-*
 /data/uploads/*
 !/data/uploads/__placeholder-*.svg
 /data/exports/

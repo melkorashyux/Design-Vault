@@ -1,5 +1,5 @@
 {
-  "name": "design-vault",
+  "name": "visual-brain",
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.js",
@@ -38,8 +38,8 @@
     "typescript": "^5"
   },
   "build": {
-    "appId": "com.mostafaelkorashy.designvault",
-    "productName": "Design Vault",
+    "appId": "com.mostafaelkorashy.visualbrain",
+    "productName": "Visual Brain",
     "asar": false,
     "npmRebuild": false,
     "directories": {

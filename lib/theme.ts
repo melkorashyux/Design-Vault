@@ -51,9 +51,9 @@ export const HEADER_SIZE_OPTIONS: HeaderSizeOption[] = [
 
 export const DEFAULT_HEADER_SIZE_ID = "default";
 
-export const FONT_STORAGE_KEY = "vault-font";
-export const ACCENT_STORAGE_KEY = "vault-accent";
-export const HEADER_SIZE_STORAGE_KEY = "vault-header-size";
+export const FONT_STORAGE_KEY = "visual-brain-font";
+export const ACCENT_STORAGE_KEY = "visual-brain-accent";
+export const HEADER_SIZE_STORAGE_KEY = "visual-brain-header-size";
 
 export function getFontById(id: string): FontOption {
   return FONT_OPTIONS.find((f) => f.id === id) ?? FONT_OPTIONS[0];

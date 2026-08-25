@@ -8,18 +8,18 @@ import {
   UNSORTED_FOLDER_NAME,
   type AnalysisStatus,
   type Folder,
-  type VaultItem,
-  type VaultItemRow,
+  type BrainItem,
+  type BrainItemRow,
 } from "@/lib/types";
 import { migrateTaxonomy } from "@/lib/taxonomyMigration";
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "vault.db");
+const DB_PATH = path.join(DATA_DIR, "visual-brain.db");
 
 fs.mkdirSync(path.join(DATA_DIR, "uploads"), { recursive: true });
 
 declare global {
-  var __vaultDb: Database.Database | undefined;
+  var __brainDb: Database.Database | undefined;
   var __unsortedFolderId: string | undefined;
 }
 
@@ -185,10 +185,10 @@ function seedTagsIfEmpty(db: Database.Database) {
 }
 
 export function getDb(): Database.Database {
-  if (!globalThis.__vaultDb) {
-    globalThis.__vaultDb = createConnection();
+  if (!globalThis.__brainDb) {
+    globalThis.__brainDb = createConnection();
   }
-  return globalThis.__vaultDb;
+  return globalThis.__brainDb;
 }
 
 export function getUnsortedFolderId(): string {
@@ -309,16 +309,16 @@ export function addTags(names: string[]): string[] {
 // Items
 // ---------------------------------------------------------------------------
 
-export function listItems(): VaultItem[] {
+export function listItems(): BrainItem[] {
   const rows = getDb()
     .prepare("SELECT * FROM items ORDER BY created_at DESC")
-    .all() as VaultItemRow[];
+    .all() as BrainItemRow[];
   return rows.map(rowToItem);
 }
 
-export function getItem(id: string): VaultItem | null {
+export function getItem(id: string): BrainItem | null {
   const row = getDb().prepare("SELECT * FROM items WHERE id = ?").get(id) as
-    | VaultItemRow
+    | BrainItemRow
     | undefined;
   return row ? rowToItem(row) : null;
 }
@@ -338,7 +338,7 @@ export interface CreateItemInput {
   analysis_status?: AnalysisStatus;
 }
 
-export function createItem(input: CreateItemInput): VaultItem {
+export function createItem(input: CreateItemInput): BrainItem {
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
@@ -371,7 +371,7 @@ export type UpdateItemInput = Partial<
   Omit<CreateItemInput, "filename"> & { source_url: string | null; folder_id: string | null }
 >;
 
-export function updateItem(id: string, input: UpdateItemInput): VaultItem | null {
+export function updateItem(id: string, input: UpdateItemInput): BrainItem | null {
   const existing = getItem(id);
   if (!existing) return null;
 
