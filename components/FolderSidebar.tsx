@@ -171,13 +171,29 @@ function FolderMenu({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  const [deleteState, setDeleteState] = useState<"idle" | "pending" | "confirm">("idle");
+  const [deleteLabel, setDeleteLabel] = useState("delete");
+  const deleteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function resetDelete() {
+    if (deleteTimerRef.current) clearInterval(deleteTimerRef.current);
+    setDeleteState("idle");
+    setDeleteLabel("delete");
+  }
+
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        resetDelete();
+      }
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        resetDelete();
+      }
     }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -187,12 +203,66 @@ function FolderMenu({
     };
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (deleteTimerRef.current) clearInterval(deleteTimerRef.current);
+    };
+  }, []);
+
   const canManage = folder.name !== UNSORTED_FOLDER_NAME;
   const canExport = folder.item_count > 0;
 
   if (!canManage && !canExport) {
     // Nothing to do for this folder — keep the reserved width so counts still align.
     return <span className="h-6 w-6 shrink-0" aria-hidden="true" />;
+  }
+
+  // Same scramble-decode hold as the detail modal's delete button: the label
+  // dissolves into random characters and re-locks into "confirm delete" in
+  // red over two seconds before the second click can actually delete anything.
+  const CONFIRM_LABEL = "confirm delete";
+  const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const DELETE_HOLD_MS = 2000;
+
+  function startDeleteHold() {
+    setDeleteState("pending");
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!reduceMotion) {
+      const start = performance.now();
+      deleteTimerRef.current = setInterval(() => {
+        const elapsed = performance.now() - start;
+        const lockedCount = Math.floor((elapsed / DELETE_HOLD_MS) * CONFIRM_LABEL.length);
+        let out = "";
+        for (let i = 0; i < CONFIRM_LABEL.length; i++) {
+          out +=
+            i < lockedCount || CONFIRM_LABEL[i] === " "
+              ? CONFIRM_LABEL[i]
+              : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)].toLowerCase();
+        }
+        setDeleteLabel(out);
+      }, 40);
+    }
+
+    setTimeout(() => {
+      if (deleteTimerRef.current) clearInterval(deleteTimerRef.current);
+      setDeleteLabel(CONFIRM_LABEL);
+      setDeleteState("confirm");
+    }, DELETE_HOLD_MS);
+  }
+
+  function handleDeleteClick() {
+    if (deleteState === "idle") {
+      startDeleteHold();
+      return;
+    }
+    if (deleteState === "pending") return;
+    setOpen(false);
+    resetDelete();
+    onDelete();
   }
 
   return (
@@ -239,13 +309,17 @@ function FolderMenu({
           {canManage && (
             <button
               role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-              className="tracked-label block w-full px-3 py-2 text-left text-muted transition-colors duration-150 hover:bg-surface-hover hover:text-accent"
+              onClick={handleDeleteClick}
+              disabled={deleteState === "pending"}
+              className={`tracked-label block w-full px-3 py-2 text-left transition-colors duration-150 hover:bg-surface-hover disabled:cursor-default ${
+                deleteState === "idle"
+                  ? "text-muted hover:text-red-500"
+                  : deleteState === "confirm"
+                    ? "text-red-500 hover:text-red-700"
+                    : "text-red-500"
+              }`}
             >
-              delete
+              {deleteState === "idle" ? "delete" : deleteLabel}
             </button>
           )}
         </div>
