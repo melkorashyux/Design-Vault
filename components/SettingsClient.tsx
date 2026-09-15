@@ -36,7 +36,7 @@ function GroupHeading({ children }: { children: React.ReactNode }) {
 
 export function SettingsClient() {
   const [loaded, setLoaded] = useState(false);
-  const [provider, setProvider] = useState<"anthropic" | "ollama">("anthropic");
+  const [provider, setProvider] = useState<"anthropic" | "ollama">("ollama");
   const [maskedKey, setMaskedKey] = useState("");
   const [keySet, setKeySet] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");

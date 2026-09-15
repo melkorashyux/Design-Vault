@@ -14,7 +14,7 @@ export interface BrainSettings {
 }
 
 const DEFAULTS: BrainSettings = {
-  analysisProvider: process.env.ANALYSIS_PROVIDER === "ollama" ? "ollama" : "anthropic",
+  analysisProvider: process.env.ANALYSIS_PROVIDER === "anthropic" ? "anthropic" : "ollama",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   analysisModel: process.env.ANALYSIS_MODEL || "claude-sonnet-5",
   ollamaHost: process.env.OLLAMA_HOST || "http://localhost:11434",
