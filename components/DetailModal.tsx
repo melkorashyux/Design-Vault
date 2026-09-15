@@ -229,10 +229,10 @@ export function DetailModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-5xl overflow-hidden border border-border bg-surface"
+        className="flex max-h-[90vh] w-full max-w-[1440px] overflow-hidden border border-border bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="group relative hidden w-1/2 shrink-0 overflow-auto border-r border-border bg-bg sm:block">
+        <div className="group relative hidden flex-1 overflow-auto border-r border-border bg-bg sm:block">
           <button
             onClick={() => setFullscreen(true)}
             title="View full screen"
@@ -251,7 +251,7 @@ export function DetailModal({
           </div>
         </div>
 
-        <div className="flex w-full flex-col overflow-hidden sm:w-1/2">
+        <div className="flex w-full flex-col overflow-hidden sm:w-[480px] sm:shrink-0">
           <div className="flex items-center justify-between border-b border-border p-4">
             {editing ? (
               <input
